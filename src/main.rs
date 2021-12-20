@@ -1,25 +1,13 @@
 use midly::{num::u28, TrackEvent};
 
+mod duration;
+
 const TICKS_PER_BEAT: u16 = 100;
 const ZERO_TICKS: u28 = u28::new(0);
 const BEAT: u28 = u28::new(TICKS_PER_BEAT as u32);
 
-struct Dur {
-    ticks: u28,
-}
-
-impl<T> From<T> for Dur
-where
-    T: Into<u32>,
-{
-    fn from(x: T) -> Self {
-        Dur {
-            ticks: x.into().into(),
-        }
-    }
-}
-
 fn main() {
+    let one_beat = duration::Dur::new(100);
     let header = midly::Header {
         format: midly::Format::Sequential,
         timing: midly::Timing::Metrical(TICKS_PER_BEAT.into()),
@@ -36,7 +24,7 @@ fn main() {
             },
         },
         TrackEvent {
-            delta: BEAT,
+            delta: one_beat.into(),
             kind: midly::TrackEventKind::Midi {
                 channel: 1.into(),
                 message: midly::MidiMessage::NoteOff {
