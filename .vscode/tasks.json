@@ -3,6 +3,20 @@
   "tasks": [
     {
       "type": "cargo",
+      "command": "clippy",
+      "problemMatcher": ["$rustc"],
+      "group": "build",
+      "label": "rust: cargo clippy"
+    },
+    {
+      "type": "cargo",
+      "command": "clippy",
+      "problemMatcher": ["$rustc"],
+      "group": "build",
+      "label": "clippy"
+    },
+    {
+      "type": "cargo",
       "command": "watch",
       "args": ["-x", "clippy"],
       "problemMatcher": ["$rustc"],
