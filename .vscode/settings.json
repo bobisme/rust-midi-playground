@@ -1,1 +1,7 @@
-{}
+{
+  "rust-analyzer.checkOnSave.enable": false,
+  "triggerTaskOnSave.on": true,
+  "triggerTaskOnSave.tasks": {
+    "testAndClippy": ["src/*", "lib/*", "Cargo.*"]
+  }
+}

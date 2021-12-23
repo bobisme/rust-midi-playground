@@ -6,10 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+const_format = "0.2.22"
 eyre = "0.6.5"
 hamcrest2 = "*"
 midir = "0.7.0"
 midly = "0.5"
 nom = "7.1.0"
+num = "0.4.0"
 pretty_assertions = "1.0.0"
 rspec = "1.0.0"

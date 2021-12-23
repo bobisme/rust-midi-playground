@@ -17,6 +17,17 @@
     },
     {
       "type": "cargo",
+      "command": "test",
+      // "problemMatcher": ["$rustc"],
+      "group": "test",
+      "label": "test"
+    },
+    {
+      "label": "testAndClippy",
+      "dependsOn": ["clippy", "test"]
+    },
+    {
+      "type": "cargo",
       "command": "watch",
       "args": ["-x", "clippy"],
       "problemMatcher": ["$rustc"],

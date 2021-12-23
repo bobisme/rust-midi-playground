@@ -1,3 +1,11 @@
+use std::{
+    io::{stdin, stdout, Write},
+    thread::sleep,
+    time::Duration,
+};
+
+use eyre::{bail, eyre};
+use midir::{MidiOutput, MidiOutputPort};
 use midly::{num::u28, TrackEvent};
 
 mod dsl;
@@ -16,7 +24,7 @@ fn play_midi() -> eyre::Result<()> {
     // Get an output port (read from console if multiple are available)
     let out_ports = midi_out.ports();
     let out_port: &MidiOutputPort = match out_ports.len() {
-        0 => return Err("no output port found".into()),
+        0 => return Err(eyre!("no output port found")),
         1 => {
             println!(
                 "Choosing the only available output port: {}",
@@ -29,13 +37,23 @@ fn play_midi() -> eyre::Result<()> {
             for (i, p) in out_ports.iter().enumerate() {
                 println!("{}: {}", i, midi_out.port_name(p).unwrap());
             }
-            print!("Please select output port: ");
-            stdout().flush()?;
-            let mut input = String::new();
-            stdin().read_line(&mut input)?;
-            out_ports
-                .get(input.trim().parse::<usize>()?)
-                .ok_or("invalid output port selected")?
+            let port = out_ports.iter().find(|p| {
+                midi_out
+                    .port_name(p)
+                    .map(|name| name == "loopMIDI Port")
+                    .unwrap()
+            });
+            if port.is_none() {
+                bail!("could not grab a port");
+            }
+            port.unwrap()
+            // print!("Please select output port: ");
+            // stdout().flush()?;
+            // let mut input = String::new();
+            // stdin().read_line(&mut input)?;
+            // out_ports
+            //     .get(input.trim().parse::<usize>()?)
+            //     .ok_or(eyre!("invalid output port selected"))?
         }
     };
 
