@@ -2,6 +2,7 @@ use std::{
     convert::{Infallible, TryFrom},
     fmt::Display,
     num::ParseFloatError,
+    time::Duration,
 };
 
 use eyre::{bail, ensure, eyre};
@@ -15,7 +16,7 @@ use nom::{
     IResult,
 };
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Beats {
     inner: f64,
 }
@@ -26,7 +27,16 @@ impl Display for Beats {
     }
 }
 
-impl Beats {}
+impl Beats {
+    pub fn from_millis(&self, millis_per_beat: impl Into<f64>) -> Duration {
+        Duration::from_millis((self.inner * millis_per_beat.into()).trunc() as u64)
+    }
+
+    pub fn from_bpm(&self, tempo: impl Into<f64>) -> Duration {
+        self.from_millis(60_000.0 / tempo.into())
+    }
+}
+
 impl PartialEq for Beats {
     fn eq(&self, other: &Self) -> bool {
         (self.inner - other.inner).abs() < 0.001
@@ -107,7 +117,7 @@ impl Default for Note {
         Self {
             note: 60,
             vel: 64,
-            beats: 0.into(),
+            beats: 1.into(),
         }
     }
 }
@@ -221,26 +231,48 @@ fn note_from_str(x: &str) -> eyre::Result<Note> {
 }
 
 impl Note {
+    pub fn off(note: u8) -> Self {
+        Note {
+            note,
+            vel: 0,
+            beats: 0.into(),
+        }
+    }
     /// Get a reference to the note's beats.
-    pub fn get_beats(self) -> Beats {
+    pub fn beats(&self) -> Beats {
         self.beats
     }
 
     /// Set the note's beats.
-    pub fn beats(self, beats: impl Into<Beats>) -> Self {
+    pub fn with_beats(&self, beats: impl Into<Beats>) -> Self {
         Note {
             beats: beats.into(),
-            ..self
+            ..*self
         }
     }
+
     /// Get a reference to the note's vel.
-    pub fn get_vel(self) -> u8 {
+    pub fn vel(&self) -> u8 {
         self.vel
     }
 
     /// Set the note's vel.
-    pub fn vel(self, vel: u8) -> Self {
-        Note { vel, ..self }
+    pub fn with_vel(&self, vel: u8) -> Self {
+        Self { vel, ..*self }
+    }
+
+    /// Get a reference to the note's note.
+    pub fn note(&self) -> u8 {
+        self.note
+    }
+}
+
+impl From<u8> for Note {
+    fn from(x: u8) -> Self {
+        Note {
+            note: x,
+            ..Default::default()
+        }
     }
 }
 

@@ -1,16 +1,22 @@
 use std::{
+    fs,
     io::{stdin, stdout, Write},
     mem,
-    thread::sleep,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    thread::{self, sleep},
     time::Duration,
 };
 
-use eyre::{bail, eyre, Result};
+use eyre::{bail, ensure, eyre, Result};
 use midir::{MidiOutput, MidiOutputPort};
 use midly::{num::u28, TrackEvent};
 
 mod dsl;
 mod duration;
+mod midi;
 mod notes;
 pub mod player;
 mod theory;
@@ -23,66 +29,77 @@ const ZERO_TICKS: u28 = u28::new(0);
 const BEAT: u28 = u28::new(TICKS_PER_BEAT as u32);
 
 fn make_some_chains() -> Result<(markov::Chain<Note>, markov::Chain<Beats>)> {
-    let mut note_chain = markov::Chain::new();
-    note_chain
-        .feed(vec![
-            Note::try_from("c1")?,
-            Note::try_from("c1")?,
-            Note::try_from("d1")?,
-            Note::try_from("c1")?,
-            Note::try_from("f1")?,
-            Note::try_from("e1")?,
-        ])
-        .feed([
-            Note::try_from("c1")?,
-            Note::try_from("c1")?,
-            Note::try_from("d1")?,
-            Note::try_from("c1")?,
-            Note::try_from("a2")?,
-            Note::try_from("f1")?,
-        ])
-        .feed([
-            Note::try_from("c1")?,
-            Note::try_from("c1")?,
-            Note::try_from("c2")?,
-            Note::try_from("a1")?,
-            Note::try_from("f1")?,
-            Note::try_from("e1")?,
-            Note::try_from("d1")?,
-        ])
-        .feed([
-            Note::try_from("c2")?,
-            Note::try_from("c2")?,
-            Note::try_from("a1")?,
-            Note::try_from("f1")?,
-            Note::try_from("g1")?,
-            Note::try_from("f1")?,
-        ]);
-    let mut beats_chain = markov::Chain::new();
-    beats_chain
-        .feed(vec![
-            2.into(),
-            1.into(),
-            2.into(),
-            2.into(),
-            2.into(),
-            3.into(),
-        ])
-        .feed([2.into(), 1.into(), 2.into(), 2.into(), 2.into(), 3.into()])
-        .feed([
-            2.into(),
-            1.into(),
-            3.into(),
-            3.into(),
-            1.into(),
-            2.into(),
-            2.into(),
-        ])
-        .feed([2.into(), 1.into(), 3.into(), 1.into(), 2.into(), 3.into()]);
+    let data = fs::read("Beethoven-Moonlight-Sonata.mid")?;
+    let parsed_midi = midi::parse(&data)?;
+    let notes = parsed_midi.notes();
+    ensure!(notes.len() != 0, "no parsed notes...");
+    let mut note_chain = markov::Chain::of_order(2);
+    note_chain.feed(notes);
+    let mut beats_chain = markov::Chain::of_order(2);
+    beats_chain.feed(notes.iter().map(|n| n.beats()).collect::<Vec<Beats>>());
+    // note_chain
+    //     .feed(vec![
+    //         Note::try_from("c1")?,
+    //         Note::try_from("c1")?,
+    //         Note::try_from("d1")?,
+    //         Note::try_from("c1")?,
+    //         Note::try_from("f1")?,
+    //         Note::try_from("e1")?,
+    //     ])
+    //     .feed([
+    //         Note::try_from("c1")?,
+    //         Note::try_from("c1")?,
+    //         Note::try_from("d1")?,
+    //         Note::try_from("c1")?,
+    //         Note::try_from("a2")?,
+    //         Note::try_from("f1")?,
+    //     ])
+    //     .feed([
+    //         Note::try_from("c1")?,
+    //         Note::try_from("c1")?,
+    //         Note::try_from("c2")?,
+    //         Note::try_from("a1")?,
+    //         Note::try_from("f1")?,
+    //         Note::try_from("e1")?,
+    //         Note::try_from("d1")?,
+    //     ])
+    //     .feed([
+    //         Note::try_from("c2")?,
+    //         Note::try_from("c2")?,
+    //         Note::try_from("a1")?,
+    //         Note::try_from("f1")?,
+    //         Note::try_from("g1")?,
+    //         Note::try_from("f1")?,
+    //     ]);
+    // let mut beats_chain = markov::Chain::of_order(2);
+    // beats_chain
+    //     .feed(vec![
+    //         2.into(),
+    //         1.into(),
+    //         2.into(),
+    //         2.into(),
+    //         2.into(),
+    //         3.into(),
+    //     ])
+    //     .feed([2.into(), 1.into(), 2.into(), 2.into(), 2.into(), 3.into()])
+    //     .feed([
+    //         2.into(),
+    //         1.into(),
+    //         3.into(),
+    //         3.into(),
+    //         1.into(),
+    //         2.into(),
+    //         2.into(),
+    //     ])
+    //     .feed([2.into(), 1.into(), 3.into(), 1.into(), 2.into(), 3.into()]);
     Ok((note_chain, beats_chain))
 }
 
 fn main() -> Result<()> {
+    let term = Arc::new(AtomicBool::new(false));
+    signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&term))?;
+    signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&term))?;
+
     println!("generating notes..");
     let (note_gen, beats_gen) = make_some_chains()?;
     let n_chain = note_gen.iter().flatten();
@@ -97,14 +114,46 @@ fn main() -> Result<()> {
     //         .join("; ")
     // );
 
-    println!("playing generated notes... ");
-    let mut player = &mut player::Player::new("Bobs thing")?;
-    player.set_tempo(150.0);
+    let mut player = player::Player::new("Bobs thing")?;
+    player.set_tempo(50.0);
     player.connect("loopMIDI Port")?;
-    println!("now");
+    let player = Arc::new(Mutex::new(player));
+
+    {
+        let player = player.clone();
+        let term = term.clone();
+        thread::spawn(move || {
+            while !term.load(Ordering::Relaxed) {
+                sleep(Duration::from_micros(50));
+            }
+            let mut guard = player.lock().unwrap();
+            (0..127).for_each(|n| guard.play(&Note::off(n)).unwrap());
+            std::process::exit(0);
+        });
+    }
+
+    let data = fs::read("Beethoven-Moonlight-Sonata.mid")?;
+    let parsed_midi = midi::parse(&data)?;
+    let notes = parsed_midi.notes();
+    ensure!(notes.len() != 0, "no parsed notes...");
+
+    // for note in notes {
+    //     if term.load(Ordering::Relaxed) {
+    //         return Ok(());
+    //     }
+    //     println!("{}", note);
+    //     let mut guard = player.lock().unwrap();
+    //     guard.play(&note)?;
+    // }
+
+    println!("playing generated notes... ");
     for note in chain {
+        if term.load(Ordering::Relaxed) {
+            return Ok(());
+        }
         println!("{}", note);
-        player.play(&note)?;
+        let mut guard = player.lock().unwrap();
+        guard.play(&note)?;
     }
 
     // let one_beat = Dur::Beats(1);

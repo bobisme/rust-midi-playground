@@ -43,12 +43,12 @@ impl std::ops::Deref for RelativeSemitone {
 pub enum Degree {
     Num(u8),
     I,
-    II,
-    III,
-    IV,
+    Ii,
+    Iii,
+    Iv,
     V,
-    VI,
-    VII,
+    Vi,
+    Vii,
     NumWithSign(u8, Sign),
 }
 
@@ -66,8 +66,8 @@ trait DegreeNum {
 
 impl Degree {
     fn sign(&self) -> Option<Sign> {
-        match self {
-            &Self::NumWithSign(_, s) => Some(s),
+        match *self {
+            Self::NumWithSign(_, s) => Some(s),
             _ => None,
         }
     }
@@ -76,15 +76,15 @@ impl Degree {
 impl DegreeNum for Degree {
     fn num(&self) -> u8 {
         match self {
-            &Self::Num(x) => x,
-            &Self::NumWithSign(x, _) => x,
-            &Self::I => 1,
-            &Self::II => 2,
-            &Self::III => 3,
-            &Self::IV => 4,
-            &Self::V => 5,
-            &Self::VI => 6,
-            &Self::VII => 7,
+            Self::Num(x) => *x,
+            Self::NumWithSign(x, _) => *x,
+            Self::I => 1,
+            Self::Ii => 2,
+            Self::Iii => 3,
+            Self::Iv => 4,
+            Self::V => 5,
+            Self::Vi => 6,
+            Self::Vii => 7,
         }
     }
 }
