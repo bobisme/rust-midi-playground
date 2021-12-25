@@ -1,5 +1,6 @@
 use std::{
     convert::{Infallible, TryFrom},
+    fmt::Display,
     num::ParseFloatError,
 };
 
@@ -14,9 +15,15 @@ use nom::{
     IResult,
 };
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Beats {
     inner: f64,
+}
+
+impl Display for Beats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.inner)
+    }
 }
 
 impl Beats {}
@@ -26,6 +33,12 @@ impl PartialEq for Beats {
     }
 }
 impl Eq for Beats {}
+
+impl std::hash::Hash for Beats {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        ((self.inner * 1_000_000f64) as u64).hash(state);
+    }
+}
 
 impl<T: Into<f64> + Copy> PartialEq<T> for Beats {
     fn eq(&self, other: &T) -> bool {
@@ -63,12 +76,30 @@ impl From<i64> for Beats {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub struct Note {
     note: u8,
     vel: u8,
     // nanobeats
     beats: Beats,
+}
+
+// impl std::slice::Join<&str> for Note {
+//     type Output = String;
+
+//     fn join(slice: &Self, sep: &str) -> Self::Output {
+//         slice
+//             .iter()
+//             .map(|x| x.to_string())
+//             .collect::<Vec<String>>()
+//             .join(sep)
+//     }
+// }
+
+impl Display for Note {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "n{}v{}b{}", self.note, self.vel, self.beats)
+    }
 }
 
 impl Default for Note {
