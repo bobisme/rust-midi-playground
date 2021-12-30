@@ -4,7 +4,10 @@ use eyre::{ensure, Result};
 use midly::{num::u7, MetaMessage, MidiMessage, Smf, TrackEventKind};
 use num::Zero;
 
-use crate::notes::{Beats, Note};
+use crate::{
+    notes::{Beats, Note},
+    sequence::Event,
+};
 
 pub struct Midi<'a> {
     smf: Smf<'a>,
@@ -85,4 +88,9 @@ pub fn parse(data: &[u8]) -> Result<Midi> {
         }
     }
     Ok(Midi { smf, notes })
+}
+
+pub struct MidiSequence<'a> {
+    smf: Smf<'a>,
+    events: Vec<Event>,
 }

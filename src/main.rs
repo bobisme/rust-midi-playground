@@ -20,6 +20,7 @@ mod midi;
 mod notes;
 pub mod player;
 mod theory;
+mod sequence;
 
 use duration::Dur;
 use notes::{Beats, Note};
