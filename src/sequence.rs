@@ -1,12 +1,28 @@
 use midly::num::u7;
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Dynamic {
     VerySoft,
     Soft,
     Medium,
     Loud,
     VeryLoud,
+}
+
+impl Dynamic {
+    pub fn to_int(&self) -> u8 {
+        match self {
+            Self::VerySoft => 16,
+            Self::Soft => 40,
+            Self::Medium => 64,
+            Self::Loud => 88,
+            Self::VeryLoud => 112,
+        }
+    }
+
+    pub fn vel(&self) -> u8 {
+        self.to_int()
+    }
 }
 
 impl From<u8> for Dynamic {
@@ -32,7 +48,7 @@ impl Default for Dynamic {
     }
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Event {
     PlayNote { key: u7, dynamic: Dynamic },
     StopNote { key: u7 },
