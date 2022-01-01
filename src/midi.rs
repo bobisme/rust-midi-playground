@@ -1,11 +1,10 @@
 use std::{
-    cell::{Ref, RefCell},
-    convert::Infallible,
+    cell::{RefCell},
 };
 
-use eyre::{bail, ensure, eyre, Result};
-use midly::{num::u7, MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
-use num::{bigint::ParseBigIntError, Zero};
+use eyre::{ensure, eyre, Result};
+use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
+use num::{Zero};
 
 use crate::{
     notes::{Beats, Note},
@@ -40,7 +39,7 @@ pub fn parse(data: &[u8]) -> Result<Midi> {
     }
     let track = smf.tracks.get(1).unwrap();
     let mut notes = Vec::<Note>::new();
-    let mut tempo = RefCell::new(25.0);
+    let tempo = RefCell::new(25.0);
     let ticks_per_beat = || {
         let out = match smf.header.timing {
             midly::Timing::Metrical(x) => x.as_int() as f32,
@@ -57,10 +56,10 @@ pub fn parse(data: &[u8]) -> Result<Midi> {
             TrackEventKind::Midi { channel, message } => {
                 use MidiMessage::*;
                 match message {
-                    NoteOff { key, vel } => {
+                    NoteOff { key: _, vel: _ } => {
                         // println!("got note off: key={} vel={}", key, vel);
                     }
-                    NoteOn { key, vel } if vel == 0 => {}
+                    NoteOn { key: _, vel } if vel == 0 => {}
                     NoteOn { key, vel } => {
                         // println!("got note on: key={} vel={}", key, vel);
                         let off = track.iter().skip(i + 1).find(|&e| match e.kind {
@@ -80,11 +79,11 @@ pub fn parse(data: &[u8]) -> Result<Midi> {
                             ));
                         }
                     }
-                    Aftertouch { key, vel } => {}
-                    Controller { controller, value } => {}
-                    ProgramChange { program } => {}
-                    ChannelAftertouch { vel } => {}
-                    PitchBend { bend } => {}
+                    Aftertouch { key: _, vel: _ } => {}
+                    Controller { controller: _, value: _ } => {}
+                    ProgramChange { program: _ } => {}
+                    ChannelAftertouch { vel: _ } => {}
+                    PitchBend { bend: _ } => {}
                 }
             }
             TrackEventKind::SysEx(_) => {}
@@ -141,7 +140,7 @@ impl Default for Parser {
 impl Parser {
     pub fn with_ticks_per_beat(&self, t: u32) -> Self {
         Self {
-            ticks_per_beat: t.into(),
+            ticks_per_beat: t,
             tempo: RefCell::new(*self.tempo.borrow()),
         }
     }
@@ -153,7 +152,7 @@ impl Parser {
             .get(track_i)
             .ok_or_else(|| eyre!("could not get track {}", track_i))?;
 
-        let mut tempo = RefCell::new(50.0);
+        let tempo = RefCell::new(50.0);
 
         let things = track
             .iter()
@@ -162,10 +161,10 @@ impl Parser {
                     tempo.replace(t.as_int() as f32);
                     (ev.delta, None)
                 }
-                TrackEventKind::Midi { channel, message } => {
+                TrackEventKind::Midi { channel: _, message } => {
                     use MidiMessage::*;
                     match message {
-                        NoteOff { key, vel } => (ev.delta, Some(Event::stop(key))),
+                        NoteOff { key, vel: _ } => (ev.delta, Some(Event::stop(key))),
                         NoteOn { key, vel } if vel == 0 => (ev.delta, Some(Event::stop(key))),
                         NoteOn { key, vel } => (ev.delta, Some(Event::play(key, vel))),
                         _ => (ev.delta, None),
@@ -175,10 +174,10 @@ impl Parser {
             })
             // .inspect(|(d, e)| println!("d={:?}, e={:?}", d, e))
             .scan(0u32, |state, (delta, event)| {
-                *state = *state + delta.as_int();
+                *state += delta.as_int();
                 match event {
                     None => Some([None, None]),
-                    Some(ev) => {
+                    Some(_ev) => {
                         let d = *state as f64;
                         let tpb = calc_ticks_per_beat(&smf.header.timing, *tempo.borrow());
                         let beats = d / tpb;

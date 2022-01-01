@@ -142,12 +142,12 @@ impl Scale {
         let base = match self.key {
             Key::Midi(m) => m as i8,
             Key::A(s) => 8 + Sign::from(s).rel(),
-            Key::B(s) => 10,
-            Key::C(s) => 0,
-            Key::D(s) => 2,
-            Key::E(s) => 4,
-            Key::F(s) => 5,
-            Key::G(s) => 7,
+            Key::B(_s) => 10,
+            Key::C(_s) => 0,
+            Key::D(_s) => 2,
+            Key::E(_s) => 4,
+            Key::F(_s) => 5,
+            Key::G(_s) => 7,
         };
         self.mode
             .semitones()

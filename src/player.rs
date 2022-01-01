@@ -2,7 +2,7 @@ use std::{thread::sleep, time::Duration};
 
 use eyre::{ensure, eyre, Result};
 use midir::{MidiOutput, MidiOutputConnection};
-use num::Zero;
+
 
 use crate::{notes::Note, sequence::Event};
 
@@ -104,15 +104,15 @@ impl<'a> Player<'a> {
             }
         }
         let max_len = self.ticks_per_beat * 8;
-        let threshold = self.ticks_played.checked_sub(max_len).unwrap_or(0);
+        let threshold = self.ticks_played.saturating_sub(max_len);
         let ringing_notes = self
             .notes_on
             .iter()
             .enumerate()
-            .filter(|&(key, start)| start.is_some())
+            .filter(|&(_key, start)| start.is_some())
             .map(|(k, &s)| (k, s.unwrap()))
-            .filter(|&(k, s)| s < threshold)
-            .map(|(k, s)| k as u8)
+            .filter(|&(_k, s)| s < threshold)
+            .map(|(k, _s)| k as u8)
             .collect::<Vec<_>>();
         for key in ringing_notes {
             self.stop_key(key);
