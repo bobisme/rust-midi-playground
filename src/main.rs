@@ -1,12 +1,9 @@
 use std::{
     fs,
-    process::exit,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
+        Arc,
     },
-    thread::{self, sleep},
-    time::Duration,
 };
 
 use clap::Parser;
@@ -23,7 +20,7 @@ mod sequence;
 mod theory;
 
 use duration::Dur;
-use notes::{Beats, Note};
+
 
 const TICKS_PER_BEAT: u16 = 100;
 const ZERO_TICKS: u28 = u28::new(0);

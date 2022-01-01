@@ -10,7 +10,7 @@ pub enum Dynamic {
 }
 
 impl Dynamic {
-    pub fn to_int(&self) -> u8 {
+    pub fn as_int(&self) -> u8 {
         match self {
             Self::VerySoft => 16,
             Self::Soft => 40,
@@ -21,7 +21,7 @@ impl Dynamic {
     }
 
     pub fn vel(&self) -> u8 {
-        self.to_int()
+        self.as_int()
     }
 }
 
@@ -56,13 +56,6 @@ pub enum Event {
 }
 
 impl Event {
-    pub fn p(key: impl Into<u7>) -> Self {
-        Self::PlayNote {
-            key: key.into(),
-            dynamic: Default::default(),
-        }
-    }
-
     pub fn play(key: impl Into<u7>, dynamic: impl Into<Dynamic>) -> Self {
         Self::PlayNote {
             key: key.into(),

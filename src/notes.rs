@@ -293,7 +293,7 @@ mod test_notes {
     struct Env {}
 
     #[test]
-    fn test_note_from_str<'a>() {
+    fn test_note_from_str() {
         rspec::run(&rspec::describe("note_from_str", Env::default(), |ctx| {
             ctx.it("parses notes", |_| {
                 assert_that!(note_from_str("c3").unwrap().note, eq(60));
