@@ -23,6 +23,26 @@ impl Dynamic {
     pub fn vel(&self) -> u8 {
         self.as_int()
     }
+
+    pub fn down(&self) -> Self {
+        match self {
+            Self::VerySoft => Self::VerySoft,
+            Self::Soft => Self::VerySoft,
+            Self::Medium => Self::Soft,
+            Self::Loud => Self::Medium,
+            Self::VeryLoud => Self::Loud,
+        }
+    }
+
+    pub fn up(&self) -> Self {
+        match self {
+            Self::VerySoft => Self::Soft,
+            Self::Soft => Self::Medium,
+            Self::Medium => Self::Loud,
+            Self::Loud => Self::VeryLoud,
+            Self::VeryLoud => Self::VeryLoud,
+        }
+    }
 }
 
 impl From<u8> for Dynamic {

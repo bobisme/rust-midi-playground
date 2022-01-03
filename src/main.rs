@@ -8,7 +8,7 @@ use std::{
 
 use clap::Parser;
 use eyre::{ensure, Result};
-
+use itertools::Itertools;
 use midly::{num::u28, TrackEvent};
 
 mod dsl;
@@ -21,6 +21,7 @@ mod theory;
 
 use duration::Dur;
 
+use crate::sequence::Event;
 
 const TICKS_PER_BEAT: u16 = 100;
 const ZERO_TICKS: u28 = u28::new(0);
@@ -68,12 +69,23 @@ struct Args {
     path: String,
 
     /// Order of the markov chain
-    #[clap(short, long, default_value_t = 1)]
+    #[clap(long, default_value_t = 1)]
     order: usize,
 
     /// Tempo
-    #[clap(short, long, default_value_t = 120)]
+    #[clap(long, default_value_t = 120)]
     tempo: usize,
+
+    // Number of events to use per chunk
+    #[clap(long, default_value_t = 1<<16)]
+    chunk_size: usize,
+
+    // The humanization delay range (±ms/2)
+    #[clap(long)]
+    human_ms: Option<u8>,
+    // The humanization velocity range (±vel/2)
+    #[clap(long)]
+    human_vel: Option<u8>,
 }
 
 fn main() -> Result<()> {
@@ -94,6 +106,12 @@ fn main() -> Result<()> {
     player.set_ticks_per_beat(seq.ticks_per_beat());
     player.set_tempo(args.tempo as f32);
     player.connect("loopMIDI Port")?;
+    if let Some(ms) = args.human_ms {
+        player.set_human_ms_range(ms as f64);
+    }
+    if let Some(vel) = args.human_vel {
+        player.set_human_vel_range(vel as f64);
+    }
 
     ensure!(!seq.events.is_empty(), "no events");
 
@@ -107,19 +125,21 @@ fn main() -> Result<()> {
 
     // generate some new material
     let mut seq_chain = markov::Chain::of_order(args.order);
-    let chunk_size: usize = 64;
-    for chunk in seq.events.chunks(chunk_size) {
-        seq_chain.feed(chunk);
-    }
-    for chunk in seq
-        .events
-        .iter()
-        .skip(chunk_size / 2)
-        .copied()
-        .collect::<Vec<_>>()
-        .chunks(chunk_size)
-    {
-        seq_chain.feed(chunk);
+    let iter = seq.events.into_iter();
+    let rev_iter = iter.clone().rev();
+    let iter = iter.chain(rev_iter);
+    let quieter = iter.clone().map(|e| {
+        if let Event::PlayNote { key, dynamic } = e {
+            Event::play(key, dynamic.down())
+        } else {
+            e
+        }
+    });
+    let iter = iter.chain(quieter);
+    let chunk_size: usize = args.chunk_size;
+    for chunk in &iter.chunks(chunk_size) {
+        let tokens = chunk.collect::<Vec<_>>();
+        seq_chain.feed(tokens);
     }
     for ev in seq_chain.iter().flatten() {
         if term.load(Ordering::Relaxed) {

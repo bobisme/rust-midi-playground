@@ -3,11 +3,17 @@ use std::{thread::sleep, time::Duration};
 use eyre::{ensure, eyre, Result};
 use midir::{MidiOutput, MidiOutputConnection};
 
-
-use crate::{notes::Note, sequence::Event};
+use crate::{
+    notes::Note,
+    sequence::{Dynamic, Event},
+};
 
 const NOTE_ON_MSG: u8 = 0x90;
 const NOTE_OFF_MSG: u8 = 0x80;
+const HUMAN_MS_RANGE: f64 = 30.0;
+const HUMAN_VEL_RANGE: f64 = 12.0;
+/// Max number of beats the player will let a note ring for.
+const MAX_NOTE_BEATS: u32 = 4;
 
 pub struct Player<'a> {
     client_name: &'a str,
@@ -18,6 +24,17 @@ pub struct Player<'a> {
 
     ticks_played: u32,
     notes_on: [Option<u32>; 128],
+    // timeshift is to correct a prior humanization delay
+    timeshift: f64,
+    human_ms_range: f64,
+    human_vel_range: f64,
+}
+
+fn add_ms(dur: Duration, ms: f64) -> Duration {
+    match ms {
+        x if x >= 0.0 => dur + Duration::from_millis(ms as u64),
+        _ => dur.saturating_sub(Duration::from_millis(-ms as u64)),
+    }
 }
 
 impl<'a> Player<'a> {
@@ -31,6 +48,9 @@ impl<'a> Player<'a> {
             conn_out: None,
             ticks_played: 0,
             notes_on: [None; 128],
+            timeshift: 0.0,
+            human_ms_range: HUMAN_MS_RANGE,
+            human_vel_range: HUMAN_VEL_RANGE,
         }
     }
 
@@ -73,9 +93,16 @@ impl<'a> Player<'a> {
         Ok(())
     }
 
-    fn play_key(&mut self, key: u8, vel: u8) {
+    fn play_key(&mut self, key: u8, dynamic: Dynamic) {
         let conn = self.conn_out.as_mut().unwrap();
         self.notes_on[key as usize] = Some(self.ticks_played);
+        let vel_range = self.human_vel_range;
+        let human = (rand::random::<f64>() * vel_range - vel_range).round() as i8;
+        let vel = match human {
+            x if x >= 0 => dynamic.vel().saturating_add(human as u8),
+            _ => dynamic.vel().saturating_sub(-human as u8),
+        };
+        println!("playing {} @ {:?} ({})", key, dynamic, vel);
         conn.send(&[NOTE_ON_MSG, key, vel]).unwrap();
     }
 
@@ -85,25 +112,33 @@ impl<'a> Player<'a> {
         conn.send(&[NOTE_OFF_MSG, key, 0]).unwrap();
     }
 
+    fn wait(&mut self, ticks: u32) {
+        let dur = self.tick_dur * ticks;
+        let dur = add_ms(dur, self.timeshift);
+        let ms_range = self.human_ms_range;
+        let shift_ms = (rand::random::<f64>() * ms_range - ms_range).round();
+        self.timeshift = -shift_ms;
+        let dur = add_ms(dur, shift_ms);
+        println!("waiting {} ticks ({:?})", ticks, dur);
+        sleep(dur);
+        self.ticks_played += ticks;
+    }
+
     pub fn event(&mut self, event: &Event) -> Result<()> {
         ensure!(self.conn_out.is_some(), "not connected to out port");
         match event {
             Event::PlayNote { key, dynamic } => {
-                println!("playing {} @ {:?}", key, dynamic);
-                self.play_key(key.as_int(), dynamic.vel());
+                self.play_key(key.as_int(), *dynamic);
             }
             Event::StopNote { key } => {
                 println!("stopping {}", key);
                 self.stop_key(key.as_int());
             }
             Event::Wait { ticks } => {
-                let dur = self.tick_dur * *ticks;
-                println!("waiting {} ticks ({:?})", ticks, dur);
-                sleep(dur);
-                self.ticks_played += *ticks;
+                self.wait(*ticks);
             }
         }
-        let max_len = self.ticks_per_beat * 8;
+        let max_len = self.ticks_per_beat * MAX_NOTE_BEATS;
         let threshold = self.ticks_played.saturating_sub(max_len);
         let ringing_notes = self
             .notes_on
@@ -118,6 +153,16 @@ impl<'a> Player<'a> {
             self.stop_key(key);
         }
         Ok(())
+    }
+
+    /// Set the player's human ms range.
+    pub fn set_human_ms_range(&mut self, human_ms_range: f64) {
+        self.human_ms_range = human_ms_range;
+    }
+
+    /// Set the player's human vel range.
+    pub fn set_human_vel_range(&mut self, human_vel_range: f64) {
+        self.human_vel_range = human_vel_range;
     }
 }
 
