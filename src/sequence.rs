@@ -70,9 +70,21 @@ impl Default for Dynamic {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Event {
-    PlayNote { key: u7, dynamic: Dynamic },
-    StopNote { key: u7 },
-    Wait { ticks: u32 },
+    PlayNote {
+        key: u7,
+        dynamic: Dynamic,
+    },
+    PlayNoteTicks {
+        key: u7,
+        dynamic: Dynamic,
+        ticks: u32,
+    },
+    StopNote {
+        key: u7,
+    },
+    Wait {
+        ticks: u32,
+    },
 }
 
 impl Event {
@@ -80,6 +92,14 @@ impl Event {
         Self::PlayNote {
             key: key.into(),
             dynamic: dynamic.into(),
+        }
+    }
+
+    pub fn play_ticks(key: impl Into<u7>, dynamic: impl Into<Dynamic>, ticks: u32) -> Self {
+        Self::PlayNoteTicks {
+            key: key.into(),
+            dynamic: dynamic.into(),
+            ticks,
         }
     }
 

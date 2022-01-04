@@ -67,19 +67,18 @@ fn write_some_midi() {
 struct Args {
     /// Path to MIDI file to rip off
     path: String,
-
     /// Order of the markov chain
     #[clap(long, default_value_t = 1)]
     order: usize,
-
     /// Tempo
     #[clap(long, default_value_t = 120)]
     tempo: usize,
-
+    /// Ticks per beat
+    #[clap(long, default_value_t = 24)]
+    ticks_per_beat: u32,
     // Number of events to use per chunk
     #[clap(long, default_value_t = 1<<16)]
     chunk_size: usize,
-
     // The humanization delay range (±ms/2)
     #[clap(long)]
     human_ms: Option<u8>,
@@ -99,7 +98,7 @@ fn main() -> Result<()> {
 
     // let data = fs::read("1st Mvmt Sonata No.14, Opus 27, No.2.mid")?;
     let data = fs::read(args.path)?;
-    let midi_parser = midi::Parser::default().with_ticks_per_beat(24);
+    let midi_parser = midi::Parser::default().with_ticks_per_beat(args.ticks_per_beat);
     let seq = midi_parser.parse_seq(&data, 0)?;
 
     let mut player = player::Player::new("Bobs thing");
@@ -128,14 +127,14 @@ fn main() -> Result<()> {
     let iter = seq.events.into_iter();
     let rev_iter = iter.clone().rev();
     let iter = iter.chain(rev_iter);
-    let quieter = iter.clone().map(|e| {
-        if let Event::PlayNote { key, dynamic } = e {
-            Event::play(key, dynamic.down())
-        } else {
-            e
-        }
-    });
-    let iter = iter.chain(quieter);
+    // let quieter = iter.clone().map(|e| {
+    //     if let Event::PlayNote { key, dynamic } = e {
+    //         Event::play(key, dynamic.down())
+    //     } else {
+    //         e
+    //     }
+    // });
+    // let iter = iter.chain(quieter);
     let chunk_size: usize = args.chunk_size;
     for chunk in &iter.chunks(chunk_size) {
         let tokens = chunk.collect::<Vec<_>>();

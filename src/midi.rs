@@ -1,10 +1,11 @@
-use std::{
-    cell::{RefCell},
-};
+use std::cell::RefCell;
 
 use eyre::{ensure, eyre, Result};
-use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
-use num::{Zero};
+use midly::{
+    num::{u28, u4, u7},
+    MetaMessage, MidiMessage, Smf, Timing, Track, TrackEvent, TrackEventKind,
+};
+use num::Zero;
 
 use crate::{
     notes::{Beats, Note},
@@ -24,11 +25,78 @@ impl<'a> Midi<'a> {
 
 fn calc_ticks_per_beat(timing: &Timing, tempo: f32) -> f64 {
     use midly::Timing::*;
-    let out = match *timing {
-        Metrical(x) => x.as_int() as f32,
-        Timecode(f, x) => f.as_f32() * x as f32 / (tempo / 60.0),
-    };
-    out as f64
+    match *timing {
+        Metrical(x) => x.as_int() as f64,
+        Timecode(f, x) => f.as_f32() as f64 * x as f64 / (tempo as f64 / 60.0),
+    }
+}
+
+fn find_next_off_delta<'a, I>(mut iter: I, key: u7, channel: Option<u4>) -> u32
+where
+    I: Iterator<Item = &'a TrackEvent<'a>>,
+{
+    use MidiMessage::*;
+
+    let delta: u32 = iter
+        .by_ref()
+        .take_while(|TrackEvent { delta, kind }| {
+            use TrackEventKind::*;
+            match kind {
+                Midi {
+                    channel: _,
+                    message,
+                } => match *message {
+                    NoteOn { key: k, vel: _ } if k == key => false,
+                    NoteOff { key: k, vel: _ } if k == key => false,
+                    _ => true,
+                },
+                _ => true,
+            }
+        })
+        .map(|ev| ev.delta.as_int())
+        .sum();
+    let off_delta = iter.next().map_or(0, |ev| ev.delta.as_int());
+    delta + off_delta
+    // iter.scan(0u32, |state, event| {
+    //             *state += event.delta.as_int();
+    //             match event {
+    //                 None => Some([None, None]),
+    //                 Some(_ev) => {
+    //                     let d = *state as f64;
+    //                     let tpb = calc_ticks_per_beat(&smf.header.timing, *tempo.borrow());
+    //                     let beats = d / tpb;
+    //                     let ticks = (beats * self.ticks_per_beat as f64).round() as u32;
+    //                     *state = 0;
+    //                     Some([Some(Event::wait(ticks)), event])
+    //                 }
+    //             }
+    // })
+
+    // if let Some(channel) = channel {
+    //     iter.find(|&e| match e.kind {
+    //         TrackEventKind::Midi {
+    //             channel: ch,
+    //             message: MidiMessage::NoteOn { key: k, vel: v },
+    //         } => ch == channel && k == key && v == 0,
+    //         TrackEventKind::Midi {
+    //             channel: ch,
+    //             message: MidiMessage::NoteOff { key: k, vel: _ },
+    //         } => ch == channel && k == key,
+    //         _ => false,
+    //     })
+    // } else {
+    //     iter.find(|&e| match e.kind {
+    //         TrackEventKind::Midi {
+    //             channel: _,
+    //             message: MidiMessage::NoteOn { key: k, vel: v },
+    //         } => k == key && v == 0,
+    //         TrackEventKind::Midi {
+    //             channel: _,
+    //             message: MidiMessage::NoteOff { key: k, vel: _ },
+    //         } => k == key,
+    //         _ => false,
+    //     })
+    // }
 }
 
 pub fn parse(data: &[u8]) -> Result<Midi> {
@@ -61,26 +129,18 @@ pub fn parse(data: &[u8]) -> Result<Midi> {
                     }
                     NoteOn { key: _, vel } if vel == 0 => {}
                     NoteOn { key, vel } => {
-                        // println!("got note on: key={} vel={}", key, vel);
-                        let off = track.iter().skip(i + 1).find(|&e| match e.kind {
-                            TrackEventKind::Midi {
-                                channel: ch,
-                                message: NoteOn { key: k, vel: v },
-                            } => ch == channel && k == key && v == 0,
-                            TrackEventKind::Midi {
-                                channel: ch,
-                                message: NoteOff { key: k, vel: _ },
-                            } => ch == channel && k == key,
-                            _ => false,
-                        });
-                        if let Some(ev) = off {
-                            notes.push(Note::from(key.as_int()).with_vel(vel.as_int()).with_beats(
-                                Beats::from(ev.delta.as_int() as f64 / ticks_per_beat()),
-                            ));
-                        }
+                        let off = find_next_off_delta(track.iter().skip(i + 1), key, Some(channel));
+                        notes.push(
+                            Note::from(key.as_int())
+                                .with_vel(vel.as_int())
+                                .with_beats(Beats::from(off as f64 / ticks_per_beat())),
+                        );
                     }
                     Aftertouch { key: _, vel: _ } => {}
-                    Controller { controller: _, value: _ } => {}
+                    Controller {
+                        controller: _,
+                        value: _,
+                    } => {}
                     ProgramChange { program: _ } => {}
                     ChannelAftertouch { vel: _ } => {}
                     PitchBend { bend: _ } => {}
@@ -145,6 +205,15 @@ impl Parser {
         }
     }
 
+    fn ticks_from_delta(&self, delta: impl Into<u32>, timing: &Timing) -> u32 {
+        let d = delta.into() as f64;
+        let tpb = calc_ticks_per_beat(timing, *self.tempo.borrow());
+        let beats = d / tpb;
+        let out = (beats * self.ticks_per_beat as f64).round() as u32;
+        // println!("parsed {} midi ticks as {} player ticks", d, out);
+        out
+    }
+
     pub fn parse_seq(&self, data: &[u8], track_i: usize) -> Result<MidiSequence> {
         let smf = Smf::parse(data)?;
         let track = smf
@@ -156,23 +225,42 @@ impl Parser {
 
         let things = track
             .iter()
-            .map(|ev| match ev.kind {
+            .enumerate()
+            .map(|(i, ev)| match ev.kind {
                 TrackEventKind::Meta(MetaMessage::Tempo(t)) => {
                     tempo.replace(t.as_int() as f32);
                     (ev.delta, None)
                 }
-                TrackEventKind::Midi { channel: _, message } => {
+                TrackEventKind::Midi {
+                    channel: ch,
+                    message,
+                } => {
                     use MidiMessage::*;
                     match message {
-                        NoteOff { key, vel: _ } => (ev.delta, Some(Event::stop(key))),
-                        NoteOn { key, vel } if vel == 0 => (ev.delta, Some(Event::stop(key))),
-                        NoteOn { key, vel } => (ev.delta, Some(Event::play(key, vel))),
+                        // NoteOff { key, vel: _ } => (ev.delta, Some(Event::stop(key))),
+                        // NoteOn { key, vel } if vel == 0 => (ev.delta, Some(Event::stop(key))),
+                        NoteOff { key, vel: _ } => (ev.delta, None),
+                        NoteOn { key, vel } if vel == 0 => (ev.delta, None),
+                        NoteOn { key, vel } => {
+                            let off = find_next_off_delta(track.iter().skip(i + 1), key, Some(ch));
+                            match off {
+                                0 => (ev.delta, Some(Event::play(key, vel))),
+                                _ => {
+                                    let ticks = self.ticks_from_delta(off, &smf.header.timing);
+                                    // let ticks = match ticks {
+                                    //     0 => 1,
+                                    //     _ => ticks,
+                                    // };
+                                    (ev.delta, Some(Event::play_ticks(key, vel, ticks)))
+                                }
+                            }
+                        }
                         _ => (ev.delta, None),
                     }
                 }
                 _ => (ev.delta, None),
             })
-            // .inspect(|(d, e)| println!("d={:?}, e={:?}", d, e))
+            // compress sequential waits
             .scan(0u32, |state, (delta, event)| {
                 *state += delta.as_int();
                 match event {

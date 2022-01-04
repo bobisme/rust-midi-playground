@@ -23,6 +23,7 @@ pub struct Player<'a> {
     conn_out: Option<MidiOutputConnection>,
 
     ticks_played: u32,
+    // all keys including the tick # after which they are expected to stop
     notes_on: [Option<u32>; 128],
     // timeshift is to correct a prior humanization delay
     timeshift: f64,
@@ -93,16 +94,20 @@ impl<'a> Player<'a> {
         Ok(())
     }
 
-    fn play_key(&mut self, key: u8, dynamic: Dynamic) {
+    fn play_key(&mut self, key: u8, dynamic: Dynamic, max_ticks: u32) {
         let conn = self.conn_out.as_mut().unwrap();
-        self.notes_on[key as usize] = Some(self.ticks_played);
+        let off_tick = self.ticks_played + max_ticks;
+        self.notes_on[key as usize] = Some(off_tick);
         let vel_range = self.human_vel_range;
         let human = (rand::random::<f64>() * vel_range - vel_range).round() as i8;
         let vel = match human {
             x if x >= 0 => dynamic.vel().saturating_add(human as u8),
             _ => dynamic.vel().saturating_sub(-human as u8),
         };
-        println!("playing {} @ {:?} ({})", key, dynamic, vel);
+        println!(
+            "playing {} @ {:?} ({}) for at least {} ticks",
+            key, dynamic, vel, max_ticks
+        );
         conn.send(&[NOTE_ON_MSG, key, vel]).unwrap();
     }
 
@@ -127,8 +132,15 @@ impl<'a> Player<'a> {
     pub fn event(&mut self, event: &Event) -> Result<()> {
         ensure!(self.conn_out.is_some(), "not connected to out port");
         match event {
-            Event::PlayNote { key, dynamic } => {
-                self.play_key(key.as_int(), *dynamic);
+            &Event::PlayNote { key, dynamic } => {
+                self.play_key(key.as_int(), dynamic, self.ticks_per_beat * MAX_NOTE_BEATS);
+            }
+            &Event::PlayNoteTicks {
+                key,
+                dynamic,
+                ticks,
+            } => {
+                self.play_key(key.as_int(), dynamic, ticks);
             }
             Event::StopNote { key } => {
                 println!("stopping {}", key);
@@ -138,20 +150,15 @@ impl<'a> Player<'a> {
                 self.wait(*ticks);
             }
         }
-        let max_len = self.ticks_per_beat * MAX_NOTE_BEATS;
-        let threshold = self.ticks_played.saturating_sub(max_len);
-        let ringing_notes = self
-            .notes_on
+        self.notes_on
             .iter()
             .enumerate()
-            .filter(|&(_key, start)| start.is_some())
-            .map(|(k, &s)| (k, s.unwrap()))
-            .filter(|&(_k, s)| s < threshold)
-            .map(|(k, _s)| k as u8)
-            .collect::<Vec<_>>();
-        for key in ringing_notes {
-            self.stop_key(key);
-        }
+            .filter(|&(_, end)| end.is_some())
+            .filter(|&(_, &end)| end.unwrap() < self.ticks_played)
+            .map(|(key, _)| key as u8)
+            .collect::<Vec<u8>>()
+            .iter()
+            .for_each(|&key| self.stop_key(key));
         Ok(())
     }
 
