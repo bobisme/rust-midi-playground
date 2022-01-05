@@ -1,0 +1,263 @@
+struct UIKey := {
+    key: int,
+    vel: int,
+    oct: int,
+    note: string,
+    offset: int,
+    black: bool,
+}
+
+export struct PlayedNote := {
+    key: int,
+    start: int,
+    end: int,
+    vel: int,
+    oct: int,
+    oct_k: int,
+    offset: int,
+}
+
+PianoKey := Rectangle {
+    property <length> white-width;
+    property <length> white-height;
+    property <length> black-pad: white-width * 0.15;
+    property <UIKey> k;
+
+    // visible: k.oct >= 0 || k.oct <= 5;
+    width: k.black ? white-width - black-pad * 2 : white-width;
+    height: k.black ? white-height * 0.6 : white-height;
+    x: ((k.oct + 2) * 7 + k.offset) * white-width + (k.black ? white-width / 2 + black-pad : 0);
+    // background: k.black ? black : white;
+    background: k.vel > 0 ? @linear-gradient(0deg, k.black ? #707070 : #b4b4b4 0%, k.black ? #000 : #ececec 100%) : k.black ? black : white;
+    border-color: k.vel > 0 ? #2c2c2c : #666;
+    border-width: 2px;
+    drop-shadow-offset-y: k.vel > 0 ? -1px : 0px;
+    drop-shadow-color: #333;
+    // drop-shadow-blur: 20px;
+    border-radius: 4px;
+
+    if !k.black: Text {
+        text: k.note + k.oct;
+        color: k.black ? white : black;
+        y: parent.height - height - 5px;
+        horizontal-alignment: center;
+        width: 100%;
+        font-size: k.black ? 11px : 13px;
+        font-weight: 700;
+        wrap: word-wrap;
+    }
+}
+
+PlayedTrail := Rectangle {
+    property <PlayedNote> n;
+    property <length> white-width;
+    property <int> k: n.oct-k;
+    property <bool> is-black: k == 1 || k == 3 || k == 6 || k == 8 || k == 10;
+    property <int> offset: is-black || k < 5 ? k / 2 : k / 2 + 1;
+    property <length> scroll-height;
+    property <int> ticks-played;
+    property <float> speed: 3.0;
+    property <color> bg: #118C8C;
+    property <color> darkbg: bg.darker(2.0);
+
+    width: 0.7 * white-width;
+    x: ((n.oct + 2) * 7 + offset) * white-width + (is-black ? white-width / 2 : 0) + (white-width - width) / 2;
+    height: (n.end - n.start) * 1px * speed;
+    y: scroll-height + (speed * n.start * 1px) - (speed * ticks-played * 1px);
+    background: darkbg.brighter(6*n.vel/127.0);
+    border-color: bg.darker(3.0);
+    border-width: 1px;
+    border-radius: width / 3;
+    drop-shadow-blur: 10px;
+    // animate y { duration: 100ms; }
+}
+
+export MainWindow := Window {
+    title: "Bob's Generated Piano";
+    preferred-height: 1080px;
+    preferred-width: 1920px;
+    property <int> ticks-played: 20;
+    property <[PlayedNote]> history: [
+        { key: 73, vel: 20, start: 10, end: 30, oct-k: 1, oct: 1},
+    ];
+    property <[UIKey]> keys: [
+        { black: false, key: 0, note: "C", oct: -2, offset: 0, vel: 0 },
+        { black: false, key: 2, note: "D", oct: -2, offset: 1, vel: 0 },
+        { black: false, key: 4, note: "E", oct: -2, offset: 2, vel: 0 },
+        { black: false, key: 5, note: "F", oct: -2, offset: 3, vel: 0 },
+        { black: false, key: 7, note: "G", oct: -2, offset: 4, vel: 0 },
+        { black: false, key: 9, note: "A", oct: -2, offset: 5, vel: 0 },
+        { black: false, key: 11, note: "B", oct: -2, offset: 6, vel: 0 },
+        { black: false, key: 12, note: "C", oct: -1, offset: 0, vel: 0 },
+        { black: false, key: 14, note: "D", oct: -1, offset: 1, vel: 0 },
+        { black: false, key: 16, note: "E", oct: -1, offset: 2, vel: 0 },
+        { black: false, key: 17, note: "F", oct: -1, offset: 3, vel: 0 },
+        { black: false, key: 19, note: "G", oct: -1, offset: 4, vel: 0 },
+        { black: false, key: 21, note: "A", oct: -1, offset: 5, vel: 0 },
+        { black: false, key: 23, note: "B", oct: -1, offset: 6, vel: 0 },
+        { black: false, key: 24, note: "C", oct: 0, offset: 0, vel: 0 },
+        { black: false, key: 26, note: "D", oct: 0, offset: 1, vel: 0 },
+        { black: false, key: 28, note: "E", oct: 0, offset: 2, vel: 0 },
+        { black: false, key: 29, note: "F", oct: 0, offset: 3, vel: 0 },
+        { black: false, key: 31, note: "G", oct: 0, offset: 4, vel: 0 },
+        { black: false, key: 33, note: "A", oct: 0, offset: 5, vel: 0 },
+        { black: false, key: 35, note: "B", oct: 0, offset: 6, vel: 0 },
+        { black: false, key: 36, note: "C", oct: 1, offset: 0, vel: 0 },
+        { black: false, key: 38, note: "D", oct: 1, offset: 1, vel: 0 },
+        { black: false, key: 40, note: "E", oct: 1, offset: 2, vel: 0 },
+        { black: false, key: 41, note: "F", oct: 1, offset: 3, vel: 0 },
+        { black: false, key: 43, note: "G", oct: 1, offset: 4, vel: 0 },
+        { black: false, key: 45, note: "A", oct: 1, offset: 5, vel: 0 },
+        { black: false, key: 47, note: "B", oct: 1, offset: 6, vel: 0 },
+        { black: false, key: 48, note: "C", oct: 2, offset: 0, vel: 0 },
+        { black: false, key: 50, note: "D", oct: 2, offset: 1, vel: 0 },
+        { black: false, key: 52, note: "E", oct: 2, offset: 2, vel: 0 },
+        { black: false, key: 53, note: "F", oct: 2, offset: 3, vel: 0 },
+        { black: false, key: 55, note: "G", oct: 2, offset: 4, vel: 0 },
+        { black: false, key: 57, note: "A", oct: 2, offset: 5, vel: 0 },
+        { black: false, key: 59, note: "B", oct: 2, offset: 6, vel: 0 },
+        { black: false, key: 60, note: "C", oct: 3, offset: 0, vel: 5 },
+        { black: false, key: 62, note: "D", oct: 3, offset: 1, vel: 0 },
+        { black: false, key: 64, note: "E", oct: 3, offset: 2, vel: 0 },
+        { black: false, key: 65, note: "F", oct: 3, offset: 3, vel: 0 },
+        { black: false, key: 67, note: "G", oct: 3, offset: 4, vel: 0 },
+        { black: false, key: 69, note: "A", oct: 3, offset: 5, vel: 0 },
+        { black: false, key: 71, note: "B", oct: 3, offset: 6, vel: 0 },
+        { black: false, key: 72, note: "C", oct: 4, offset: 0, vel: 0 },
+        { black: false, key: 74, note: "D", oct: 4, offset: 1, vel: 0 },
+        { black: false, key: 76, note: "E", oct: 4, offset: 2, vel: 0 },
+        { black: false, key: 77, note: "F", oct: 4, offset: 3, vel: 0 },
+        { black: false, key: 79, note: "G", oct: 4, offset: 4, vel: 0 },
+        { black: false, key: 81, note: "A", oct: 4, offset: 5, vel: 0 },
+        { black: false, key: 83, note: "B", oct: 4, offset: 6, vel: 0 },
+        { black: false, key: 84, note: "C", oct: 5, offset: 0, vel: 0 },
+        { black: false, key: 86, note: "D", oct: 5, offset: 1, vel: 0 },
+        { black: false, key: 88, note: "E", oct: 5, offset: 2, vel: 0 },
+        { black: false, key: 89, note: "F", oct: 5, offset: 3, vel: 0 },
+        { black: false, key: 91, note: "G", oct: 5, offset: 4, vel: 0 },
+        { black: false, key: 93, note: "A", oct: 5, offset: 5, vel: 0 },
+        { black: false, key: 95, note: "B", oct: 5, offset: 6, vel: 0 },
+        { black: false, key: 96, note: "C", oct: 6, offset: 0, vel: 0 },
+        { black: false, key: 98, note: "D", oct: 6, offset: 1, vel: 0 },
+        { black: false, key: 100, note: "E", oct: 6, offset: 2, vel: 0 },
+        { black: false, key: 101, note: "F", oct: 6, offset: 3, vel: 0 },
+        { black: false, key: 103, note: "G", oct: 6, offset: 4, vel: 0 },
+        { black: false, key: 105, note: "A", oct: 6, offset: 5, vel: 0 },
+        { black: false, key: 107, note: "B", oct: 6, offset: 6, vel: 0 },
+        { black: false, key: 108, note: "C", oct: 7, offset: 0, vel: 0 },
+        { black: false, key: 110, note: "D", oct: 7, offset: 1, vel: 0 },
+        { black: false, key: 112, note: "E", oct: 7, offset: 2, vel: 0 },
+        { black: false, key: 113, note: "F", oct: 7, offset: 3, vel: 0 },
+        { black: false, key: 115, note: "G", oct: 7, offset: 4, vel: 0 },
+        { black: false, key: 117, note: "A", oct: 7, offset: 5, vel: 0 },
+        { black: false, key: 119, note: "B", oct: 7, offset: 6, vel: 0 },
+        { black: false, key: 120, note: "C", oct: 8, offset: 0, vel: 0 },
+        { black: false, key: 122, note: "D", oct: 8, offset: 1, vel: 0 },
+        { black: false, key: 124, note: "E", oct: 8, offset: 2, vel: 0 },
+        { black: false, key: 125, note: "F", oct: 8, offset: 3, vel: 0 },
+        { black: false, key: 127, note: "G", oct: 8, offset: 4, vel: 0 },
+        { black: true, key: 1, note: "C#/Db", oct: -2, offset: 0, vel: 0 },
+        { black: true, key: 3, note: "D#/Eb", oct: -2, offset: 1, vel: 0 },
+        { black: true, key: 6, note: "F#/Gb", oct: -2, offset: 3, vel: 0 },
+        { black: true, key: 8, note: "G#/Ab", oct: -2, offset: 4, vel: 0 },
+        { black: true, key: 10, note: "A#/Bb", oct: -2, offset: 5, vel: 0 },
+        { black: true, key: 13, note: "C#/Db", oct: -1, offset: 0, vel: 0 },
+        { black: true, key: 15, note: "D#/Eb", oct: -1, offset: 1, vel: 0 },
+        { black: true, key: 18, note: "F#/Gb", oct: -1, offset: 3, vel: 0 },
+        { black: true, key: 20, note: "G#/Ab", oct: -1, offset: 4, vel: 0 },
+        { black: true, key: 22, note: "A#/Bb", oct: -1, offset: 5, vel: 0 },
+        { black: true, key: 25, note: "C#/Db", oct: 0, offset: 0, vel: 0 },
+        { black: true, key: 27, note: "D#/Eb", oct: 0, offset: 1, vel: 0 },
+        { black: true, key: 30, note: "F#/Gb", oct: 0, offset: 3, vel: 0 },
+        { black: true, key: 32, note: "G#/Ab", oct: 0, offset: 4, vel: 0 },
+        { black: true, key: 34, note: "A#/Bb", oct: 0, offset: 5, vel: 0 },
+        { black: true, key: 37, note: "C#/Db", oct: 1, offset: 0, vel: 0 },
+        { black: true, key: 39, note: "D#/Eb", oct: 1, offset: 1, vel: 0 },
+        { black: true, key: 42, note: "F#/Gb", oct: 1, offset: 3, vel: 0 },
+        { black: true, key: 44, note: "G#/Ab", oct: 1, offset: 4, vel: 3 },
+        { black: true, key: 46, note: "A#/Bb", oct: 1, offset: 5, vel: 0 },
+        { black: true, key: 49, note: "C#/Db", oct: 2, offset: 0, vel: 0 },
+        { black: true, key: 51, note: "D#/Eb", oct: 2, offset: 1, vel: 0 },
+        { black: true, key: 54, note: "F#/Gb", oct: 2, offset: 3, vel: 0 },
+        { black: true, key: 56, note: "G#/Ab", oct: 2, offset: 4, vel: 0 },
+        { black: true, key: 58, note: "A#/Bb", oct: 2, offset: 5, vel: 0 },
+        { black: true, key: 61, note: "C#/Db", oct: 3, offset: 0, vel: 0 },
+        { black: true, key: 63, note: "D#/Eb", oct: 3, offset: 1, vel: 0 },
+        { black: true, key: 66, note: "F#/Gb", oct: 3, offset: 3, vel: 0 },
+        { black: true, key: 68, note: "G#/Ab", oct: 3, offset: 4, vel: 0 },
+        { black: true, key: 70, note: "A#/Bb", oct: 3, offset: 5, vel: 0 },
+        { black: true, key: 73, note: "C#/Db", oct: 4, offset: 0, vel: 0 },
+        { black: true, key: 75, note: "D#/Eb", oct: 4, offset: 1, vel: 0 },
+        { black: true, key: 78, note: "F#/Gb", oct: 4, offset: 3, vel: 0 },
+        { black: true, key: 80, note: "G#/Ab", oct: 4, offset: 4, vel: 0 },
+        { black: true, key: 82, note: "A#/Bb", oct: 4, offset: 5, vel: 0 },
+        { black: true, key: 85, note: "C#/Db", oct: 5, offset: 0, vel: 0 },
+        { black: true, key: 87, note: "D#/Eb", oct: 5, offset: 1, vel: 0 },
+        { black: true, key: 90, note: "F#/Gb", oct: 5, offset: 3, vel: 0 },
+        { black: true, key: 92, note: "G#/Ab", oct: 5, offset: 4, vel: 0 },
+        { black: true, key: 94, note: "A#/Bb", oct: 5, offset: 5, vel: 0 },
+        { black: true, key: 97, note: "C#/Db", oct: 6, offset: 0, vel: 0 },
+        { black: true, key: 99, note: "D#/Eb", oct: 6, offset: 1, vel: 0 },
+        { black: true, key: 102, note: "F#/Gb", oct: 6, offset: 3, vel: 0 },
+        { black: true, key: 104, note: "G#/Ab", oct: 6, offset: 4, vel: 0 },
+        { black: true, key: 106, note: "A#/Bb", oct: 6, offset: 5, vel: 0 },
+        { black: true, key: 109, note: "C#/Db", oct: 7, offset: 0, vel: 0 },
+        { black: true, key: 111, note: "D#/Eb", oct: 7, offset: 1, vel: 0 },
+        { black: true, key: 114, note: "F#/Gb", oct: 7, offset: 3, vel: 0 },
+        { black: true, key: 116, note: "G#/Ab", oct: 7, offset: 4, vel: 0 },
+        { black: true, key: 118, note: "A#/Bb", oct: 7, offset: 5, vel: 0 },
+        { black: true, key: 121, note: "C#/Db", oct: 8, offset: 0, vel: 0 },
+        { black: true, key: 123, note: "D#/Eb", oct: 8, offset: 1, vel: 0 },
+        { black: true, key: 126, note: "F#/Gb", oct: 8, offset: 3, vel: 0 },
+    ];
+    property <length> white-width: width / (7 * 7);
+    property <length> white-height: 100px;
+    Rectangle { 
+        property <length> x-offset: -(root.white-width * 7);
+        background: #222;
+
+        // highlights
+        Rectangle { 
+            height: parent.height - root.white-height - 3px;
+            x: parent.x-offset;
+            width: parent.width - x;
+            for iter_played_note[_] in root.history: PlayedTrail {
+                white-width: root.white-width;
+                n: iter_played_note;
+                scroll-height: parent.height;
+                ticks-played: root.ticks-played;
+            }
+
+            Rectangle { 
+                background: @linear-gradient(0deg, #00000000 30%, #000000FF);
+            }
+        }
+
+        Rectangle { 
+            height: white-height;
+            y: parent.height - root.white-height;
+            x: parent.x-offset;
+            width: parent.width + -x;
+            clip: true;
+
+            // keys
+            for key[_] in root.keys: Rectangle {
+                PianoKey { 
+                    k: key;
+                    white-width: root.white-width;
+                    white-height: root.white-height;
+                }
+            }
+
+            // border
+            Rectangle { 
+                background: @linear-gradient(0deg, red 0%, darkred 10%, black 30%);
+                height: 10px;
+                y: -7px;
+                drop-shadow-color: #000;
+                drop-shadow-blur: 10px;
+                drop-shadow-offset-y: 7px;
+            }
+        }
+    }
+}

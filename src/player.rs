@@ -1,4 +1,4 @@
-use std::{thread::sleep, time::Duration};
+use std::{sync::atomic::AtomicU32, thread::sleep, time::Duration};
 
 use eyre::{ensure, eyre, Result};
 use midir::{MidiOutput, MidiOutputConnection};
@@ -104,10 +104,10 @@ impl<'a> Player<'a> {
             x if x >= 0 => dynamic.vel().saturating_add(human as u8),
             _ => dynamic.vel().saturating_sub(-human as u8),
         };
-        println!(
-            "playing {} @ {:?} ({}) for at least {} ticks",
-            key, dynamic, vel, max_ticks
-        );
+        // println!(
+        //     "playing {} @ {:?} ({}) for at least {} ticks",
+        //     key, dynamic, vel, max_ticks
+        // );
         conn.send(&[NOTE_ON_MSG, key, vel]).unwrap();
     }
 
@@ -124,7 +124,7 @@ impl<'a> Player<'a> {
         let shift_ms = (rand::random::<f64>() * ms_range - ms_range).round();
         self.timeshift = -shift_ms;
         let dur = add_ms(dur, shift_ms);
-        println!("waiting {} ticks ({:?})", ticks, dur);
+        // println!("waiting {} ticks ({:?})", ticks, dur);
         sleep(dur);
         self.ticks_played += ticks;
     }
@@ -170,6 +170,16 @@ impl<'a> Player<'a> {
     /// Set the player's human vel range.
     pub fn set_human_vel_range(&mut self, human_vel_range: f64) {
         self.human_vel_range = human_vel_range;
+    }
+
+    /// Get a reference to the player's ticks played.
+    pub fn ticks_played(&self) -> u32 {
+        self.ticks_played
+    }
+
+    /// Get a reference to the player's tick duration.
+    pub fn tick_dur(&self) -> Duration {
+        self.tick_dur
     }
 }
 
