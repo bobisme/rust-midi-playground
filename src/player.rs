@@ -1,4 +1,4 @@
-use std::{sync::atomic::AtomicU32, thread::sleep, time::Duration};
+use std::{thread::sleep, time::Duration};
 
 use eyre::{ensure, eyre, Result};
 use midir::{MidiOutput, MidiOutputConnection};

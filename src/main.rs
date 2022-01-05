@@ -107,7 +107,7 @@ struct Args {
 // }
 
 fn key_offset(key: u8) -> i32 {
-    let oct = key / 12;
+    let _oct = key / 12;
     let oct_k = key % 12;
     match oct_k {
         1 | 3 | 6 | 8 | 10 => oct_k / 2,
@@ -137,30 +137,28 @@ impl<'a> UIPlayer<'a> {
     pub fn event(&mut self, event: &Event) -> Result<()> {
         self.player.event(event)?;
         let ticks_played = self.player.ticks_played();
-        match *event {
-            Event::PlayNoteTicks {
-                key,
-                dynamic,
-                ticks,
-            } => {
-                let k = key.as_int() as usize;
-                let end_ticks = ticks_played + ticks;
-                self.notes_on[k] = (dynamic.as_int(), ticks_played, end_ticks);
-                while self.note_history.len() >= self.note_history.capacity() {
-                    self.note_history.pop_front();
-                }
-                self.note_history.push_back(PlayedNote {
-                    end: end_ticks.try_into()?,
-                    key: key.as_int().into(),
-                    offset: key_offset(key.as_int()),
-                    start: ticks_played.try_into()?,
-                    oct: (key.as_int() / 12) as i32 - 2,
-                    oct_k: (key.as_int() % 12).into(),
-                    vel: dynamic.as_int().into(),
-                });
+        if let Event::PlayNoteTicks {
+            key,
+            dynamic,
+            ticks,
+        } = *event
+        {
+            let k = key.as_int() as usize;
+            let end_ticks = ticks_played + ticks;
+            self.notes_on[k] = (dynamic.as_int(), ticks_played, end_ticks);
+            while self.note_history.len() >= self.note_history.capacity() {
+                self.note_history.pop_front();
             }
-            _ => {}
-        }
+            self.note_history.push_back(PlayedNote {
+                end: end_ticks.try_into()?,
+                key: key.as_int().into(),
+                offset: key_offset(key.as_int()),
+                start: ticks_played.try_into()?,
+                oct: (key.as_int() / 12) as i32 - 2,
+                oct_k: (key.as_int() % 12).into(),
+                vel: dynamic.as_int().into(),
+            });
+        };
         self.notes_on
             .iter()
             .enumerate()
@@ -268,7 +266,7 @@ fn main() -> Result<()> {
         //     println!("\t\t{:?},", k);
         // }
         let keys_model = Rc::new(sixtyfps::VecModel::from(keys));
-        main.set_keys(sixtyfps::ModelHandle::new(keys_model.clone()));
+        main.set_keys(sixtyfps::ModelHandle::new(keys_model));
         let mut player = UIPlayer::new(player);
         let clocked_ticks = Arc::new(AtomicU32::new(0));
         let tick_dur = player.tick_dur();
@@ -289,7 +287,7 @@ fn main() -> Result<()> {
         });
 
         let handle_weak = main.as_weak();
-        let thread_arc = clocked_ticks.clone();
+        let thread_arc = clocked_ticks;
         std::thread::spawn(move || {
             let clocked_ticks = thread_arc;
             for ev in seq_chain.iter().flatten() {

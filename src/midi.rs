@@ -2,8 +2,8 @@ use std::cell::RefCell;
 
 use eyre::{ensure, eyre, Result};
 use midly::{
-    num::{u28, u4, u7},
-    MetaMessage, MidiMessage, Smf, Timing, Track, TrackEvent, TrackEventKind,
+    num::{u4, u7},
+    MetaMessage, MidiMessage, Smf, Timing, TrackEvent, TrackEventKind,
 };
 use num::Zero;
 
@@ -31,7 +31,7 @@ fn calc_ticks_per_beat(timing: &Timing, tempo: f32) -> f64 {
     }
 }
 
-fn find_next_off_delta<'a, I>(mut iter: I, key: u7, channel: Option<u4>) -> u32
+fn find_next_off_delta<'a, I>(mut iter: I, key: u7, _channel: Option<u4>) -> u32
 where
     I: Iterator<Item = &'a TrackEvent<'a>>,
 {
@@ -39,7 +39,7 @@ where
 
     let delta: u32 = iter
         .by_ref()
-        .take_while(|TrackEvent { delta, kind }| {
+        .take_while(|TrackEvent { delta: _, kind }| {
             use TrackEventKind::*;
             match kind {
                 Midi {
@@ -209,9 +209,9 @@ impl Parser {
         let d = delta.into() as f64;
         let tpb = calc_ticks_per_beat(timing, *self.tempo.borrow());
         let beats = d / tpb;
-        let out = (beats * self.ticks_per_beat as f64).round() as u32;
+        
         // println!("parsed {} midi ticks as {} player ticks", d, out);
-        out
+        (beats * self.ticks_per_beat as f64).round() as u32
     }
 
     pub fn parse_seq(&self, data: &[u8], track_i: usize) -> Result<MidiSequence> {
@@ -239,8 +239,8 @@ impl Parser {
                     match message {
                         // NoteOff { key, vel: _ } => (ev.delta, Some(Event::stop(key))),
                         // NoteOn { key, vel } if vel == 0 => (ev.delta, Some(Event::stop(key))),
-                        NoteOff { key, vel: _ } => (ev.delta, None),
-                        NoteOn { key, vel } if vel == 0 => (ev.delta, None),
+                        NoteOff { key: _, vel: _ } => (ev.delta, None),
+                        NoteOn { key: _, vel } if vel == 0 => (ev.delta, None),
                         NoteOn { key, vel } => {
                             let off = find_next_off_delta(track.iter().skip(i + 1), key, Some(ch));
                             match off {
