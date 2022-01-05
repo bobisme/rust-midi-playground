@@ -210,10 +210,10 @@ export MainWindow := Window {
         { black: true, key: 123, note: "D#/Eb", oct: 8, offset: 1, vel: 0 },
         { black: true, key: 126, note: "F#/Gb", oct: 8, offset: 3, vel: 0 },
     ];
-    property <length> white-width: width / (7 * 7);
-    property <length> white-height: 100px;
+    property <length> white-width: width / (7 * 6);
+    property <length> white-height: 200px;
     Rectangle { 
-        property <length> x-offset: -(root.white-width * 7);
+        property <length> x-offset: -(root.white-width * 7 * 1);
         background: #222;
 
         // highlights
